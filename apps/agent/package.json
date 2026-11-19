@@ -1,0 +1,20 @@
+{
+  "name": "@aba/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "scan": "tsx src/cli/scan.ts",
+    "execute": "tsx src/cli/execute.ts",
+    "ui": "tsx watch src/ui/server.ts",
+    "typecheck": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "express": "^5.1.0",
+    "playwright": "^1.49.0",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.0"
+  }
+}
