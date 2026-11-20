@@ -22,12 +22,12 @@ export class RunStore {
   async listRuns(): Promise<RunMeta[]> {
     if (!existsSync(this.root)) return [];
     const ids = await readdir(this.root);
-    const runs: RunMeta[] = [];
-    for (const id of ids) {
-      const meta = await this.readOptional(id, 'run.json', RunMeta);
-      if (meta) runs.push(meta);
-    }
-    return runs.sort((a, b) => b.startedAt.localeCompare(a.startedAt));
+    const runs = await Promise.all(
+      ids.map((id) => this.read(id, 'run.json', RunMeta).catch(() => undefined)),
+    );
+    return runs
+      .filter((r): r is RunMeta => r !== undefined)
+      .sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   }
 
   getRun(runId: string) {
@@ -69,16 +69,6 @@ export class RunStore {
   private async read<T>(runId: string, file: string, schema: z.ZodType<T>): Promise<T> {
     const raw = await readFile(path.join(this.dir(runId), file), 'utf8');
     return schema.parse(JSON.parse(raw));
-  }
-
-  private async readOptional<T>(
-    runId: string,
-    file: string,
-    schema: z.ZodType<T>,
-  ): Promise<T | undefined> {
-    const full = path.join(this.dir(runId), file);
-    if (!existsSync(full)) return undefined;
-    return this.read(runId, file, schema);
   }
 
   private async write(runId: string, file: string, data: unknown): Promise<void> {

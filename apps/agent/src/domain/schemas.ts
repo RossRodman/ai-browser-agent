@@ -3,14 +3,7 @@ import { z } from 'zod';
 export const RunMode = z.enum(['read_only', 'write']);
 export type RunMode = z.infer<typeof RunMode>;
 
-export const RunStatus = z.enum([
-  'running',
-  'awaiting_approval',
-  'executing',
-  'completed',
-  'failed',
-]);
-export type RunStatus = z.infer<typeof RunStatus>;
+const RunStatus = z.enum(['running', 'awaiting_approval', 'executing', 'completed', 'failed']);
 
 export const RawRecord = z.object({
   id: z.string(),
@@ -26,7 +19,7 @@ export type RawRecord = z.infer<typeof RawRecord>;
 export const EditableField = z.enum(['name', 'email', 'phone', 'status', 'amount']);
 export type EditableField = z.infer<typeof EditableField>;
 
-export const Severity = z.enum(['low', 'medium', 'high']);
+const Severity = z.enum(['low', 'medium', 'high']);
 export type Severity = z.infer<typeof Severity>;
 
 export const Finding = z.object({
@@ -35,26 +28,18 @@ export const Finding = z.object({
   rule: z.string(),
   severity: Severity,
   message: z.string(),
-  source: z.enum(['rule', 'model']),
 });
 export type Finding = z.infer<typeof Finding>;
-
-export const ActionStatus = z.enum(['pending', 'approved', 'rejected', 'executed', 'failed']);
-export type ActionStatus = z.infer<typeof ActionStatus>;
-
-export const ActionType = z.enum(['update_field']);
-export type ActionType = z.infer<typeof ActionType>;
 
 export const ProposedAction = z.object({
   id: z.string(),
   findingId: z.string(),
   recordId: z.string(),
-  type: ActionType,
   field: EditableField,
   from: z.string(),
   to: z.string(),
   reason: z.string(),
-  status: ActionStatus,
+  status: z.enum(['pending', 'approved', 'rejected', 'executed', 'failed']),
   decidedBy: z.string().optional(),
   decidedAt: z.string().optional(),
   error: z.string().optional(),

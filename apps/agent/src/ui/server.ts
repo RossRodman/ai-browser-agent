@@ -1,5 +1,5 @@
 import express from 'express';
-import { loadEnv, resolveRunsDir } from '../paths';
+import { loadEnv, resolveRunsDir } from '../config';
 import { RunStore } from '../domain';
 
 loadEnv();

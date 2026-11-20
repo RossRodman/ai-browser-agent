@@ -40,13 +40,12 @@ export function analyzeWithRules(records: RawRecord[], now = new Date()) {
   for (const r of records) {
     const add = (rule: string, severity: Severity, message: string, fix?: Fix) => {
       const id = `f_${hash(r.id, rule)}`;
-      findings.push({ id, recordId: r.id, rule, severity, message, source: 'rule' });
+      findings.push({ id, recordId: r.id, rule, severity, message });
       if (!fix) return;
       proposals.push({
         id: `a_${hash(id, fix.field, fix.to)}`,
         findingId: id,
         recordId: r.id,
-        type: 'update_field',
         field: fix.field,
         from: r[fix.field],
         to: fix.to,
