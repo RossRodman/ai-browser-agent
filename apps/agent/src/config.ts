@@ -1,4 +1,17 @@
-import { loadEnv, resolveRunsDir } from './paths';
+import { existsSync } from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
+
+export function loadEnv(): void {
+  const file = path.join(REPO_ROOT, '.env');
+  if (existsSync(file)) process.loadEnvFile(file);
+}
+
+export function resolveRunsDir(): string {
+  return path.resolve(REPO_ROOT, process.env.RUNS_DIR ?? 'runs');
+}
 
 export interface AgentConfig {
   baseUrl: string;
