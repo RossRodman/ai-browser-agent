@@ -30,9 +30,12 @@ function layout(title: string, body: string): string {
   code{background:#f3f3f3;padding:0 .25rem}
   .pending{color:#8a6d00}.approved{color:#0b6}.rejected{color:#999}.executed{color:#06c}.failed{color:#c00}
   .high{color:#c00}.medium{color:#a60}.low{color:#666}
+  .source-model{background:#eef;padding:0 .3rem;border-radius:3px}
   img{max-width:240px;border:1px solid #ddd}
 </style></head><body>${body}</body></html>`;
 }
+
+const source = (s: string) => `<small class="source-${esc(s)}">${esc(s)}</small>`;
 
 function table(headers: string[], rows: string[], empty = 'None'): string {
   const head = headers.map((h) => `<th>${h}</th>`).join('');
@@ -73,7 +76,7 @@ app.get('/runs/:id', async (req, res) => {
     const finding = findings.find((f) => f.id === p.findingId);
     return `<tr>
         <td>#${esc(p.recordId)}</td>
-        <td>${esc(finding?.message)}</td>
+        <td>${esc(finding?.message)} ${finding ? source(finding.source) : ''}</td>
         <td><code>${esc(p.field)}</code>: <code>${esc(p.from)}</code> → <code>${esc(p.to)}</code><br><small>${esc(p.reason)}</small></td>
         <td class="${esc(p.status)}">${esc(p.status)}${p.decidedBy ? `<br><small>${esc(p.decidedBy)}, ${esc(p.decidedAt)}</small>` : ''}${p.error ? `<br><small>${esc(p.error)}</small>` : ''}</td>
         <td>${
@@ -92,7 +95,7 @@ app.get('/runs/:id', async (req, res) => {
     .filter((f) => !withAction.has(f.id))
     .map(
       (f) => `<tr><td>#${esc(f.recordId)}</td><td class="${esc(f.severity)}">${esc(f.severity)}</td>
-        <td><code>${esc(f.rule)}</code></td><td>${esc(f.message)}</td></tr>`,
+        <td><code>${esc(f.rule)}</code></td><td>${esc(f.message)}</td><td>${source(f.source)}</td></tr>`,
     );
 
   const stepRows = steps.map(
@@ -120,7 +123,7 @@ app.get('/runs/:id', async (req, res) => {
       ${approved > 0 ? `<p>To apply: <code>npm run agent:execute -- --run ${esc(id)}</code></p>` : ''}
 
       <h2>Findings that need manual handling (${findings.length - withAction.size})</h2>
-      ${table(['Record', 'Severity', 'Rule', 'Message'], otherFindings)}
+      ${table(['Record', 'Severity', 'Rule', 'Message', 'Source'], otherFindings)}
 
       <h2>Steps (${steps.length})</h2>
       ${table(['#', 'Step', 'Attempt', 'Result', 'Time', 'Details', 'Screenshot'], stepRows)}`,

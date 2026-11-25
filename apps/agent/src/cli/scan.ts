@@ -1,6 +1,7 @@
 import type { RawRecord, RunMeta } from '../domain';
 import { errorMessage } from '../core/errors';
 import { analyzeWithRules } from '../analysis/rules';
+import { analyzeWithModel, createChat } from '../analysis/model';
 import { openBrowser, runCli, setup } from './start-run';
 
 runCli(async () => {
@@ -31,6 +32,23 @@ runCli(async () => {
     }
 
     const { findings, proposals } = analyzeWithRules(records);
+
+    const chat = createChat(cfg.llm);
+    if (!chat) {
+      console.log('Model analysis skipped: LLM_API_KEY, LLM_MODEL or LLM_BASE_URL is not set');
+    } else {
+      try {
+        const extra = await steps.step(
+          'model analysis',
+          () => analyzeWithModel(records, findings, chat),
+          (r) => ({ findings: r.findings.length }),
+        );
+        findings.push(...extra.findings);
+        proposals.push(...extra.proposals);
+      } catch {
+        console.warn('Model analysis failed, continuing with rule results only');
+      }
+    }
     await store.saveRecords(run.id, records);
     await store.saveFindings(run.id, findings);
     await store.saveProposals(run.id, proposals);

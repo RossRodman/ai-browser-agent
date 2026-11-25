@@ -21,6 +21,7 @@ export interface AgentConfig {
   headless: boolean;
   maxAttempts: number;
   browserPath?: string;
+  llm: { apiKey: string; model: string; baseUrl: string };
 }
 
 export function loadConfig(): AgentConfig {
@@ -34,5 +35,10 @@ export function loadConfig(): AgentConfig {
     headless: env.HEADLESS !== 'false',
     maxAttempts: Number(env.MAX_ATTEMPTS ?? 3),
     browserPath: env.BROWSER_PATH || undefined,
+    llm: {
+      apiKey: env.LLM_API_KEY ?? '',
+      model: env.LLM_MODEL ?? '',
+      baseUrl: (env.LLM_BASE_URL ?? '').replace(/\/$/, ''),
+    },
   };
 }
