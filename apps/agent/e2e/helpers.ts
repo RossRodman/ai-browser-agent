@@ -51,6 +51,7 @@ export async function startApp() {
     RUNS_DIR: runsDir,
     DEMO_FAILURE_RATE: '0',
     HEADLESS: 'true',
+    LLM_API_KEY: '',
   };
   const servers = [
     tsx('apps/demo-site/src/server.ts', [], env),

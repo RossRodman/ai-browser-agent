@@ -19,7 +19,7 @@ export type RawRecord = z.infer<typeof RawRecord>;
 export const EditableField = z.enum(['name', 'email', 'phone', 'status', 'amount']);
 export type EditableField = z.infer<typeof EditableField>;
 
-const Severity = z.enum(['low', 'medium', 'high']);
+export const Severity = z.enum(['low', 'medium', 'high']);
 export type Severity = z.infer<typeof Severity>;
 
 export const Finding = z.object({
@@ -28,6 +28,7 @@ export const Finding = z.object({
   rule: z.string(),
   severity: Severity,
   message: z.string(),
+  source: z.enum(['rule', 'model']).default('rule'),
 });
 export type Finding = z.infer<typeof Finding>;
 
