@@ -3,7 +3,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { RunStore } from '../src/domain';
+import { createStore } from '../src/domain';
 import { openSession } from '../src/browser/session';
 import { DemoSite } from '../src/browser/demo-site';
 
@@ -52,13 +52,15 @@ export async function startApp() {
     DEMO_FAILURE_RATE: '0',
     HEADLESS: 'true',
     LLM_API_KEY: '',
+    STORE: process.env.STORE || 'file',
+    DATABASE_URL: process.env.DATABASE_URL ?? '',
   };
   const servers = [
     tsx('apps/demo-site/src/server.ts', [], env),
     tsx('apps/agent/src/ui/server.ts', [], env),
   ];
   await Promise.all([waitFor(BASE_URL), waitFor(UI_URL)]);
-  const store = new RunStore(runsDir);
+  const store = createStore({ store: env.STORE, databaseUrl: env.DATABASE_URL, runsDir });
 
   return {
     scan: () => run('apps/agent/src/cli/scan.ts', [], env),
@@ -101,6 +103,7 @@ export async function startApp() {
 
     stop: async () => {
       servers.forEach((s) => s.kill());
+      await store.close();
       await rm(runsDir, { recursive: true, force: true });
     },
   };

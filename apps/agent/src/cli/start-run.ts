@@ -1,14 +1,9 @@
-import { RunStore, type RunMode } from '../domain';
+import { createStore, type RunMode, type RunStore } from '../domain';
 import { loadConfig, type AgentConfig } from '../config';
 import { openSession } from '../browser/session';
 import { DemoSite } from '../browser/demo-site';
 import { StepRunner } from '../core/audit';
 import { errorMessage } from '../core/errors';
-
-export function setup() {
-  const cfg = loadConfig();
-  return { cfg, store: new RunStore(cfg.runsDir) };
-}
 
 export async function openBrowser(cfg: AgentConfig, store: RunStore, runId: string, mode: RunMode) {
   await store.init(runId);
@@ -24,9 +19,18 @@ export async function openBrowser(cfg: AgentConfig, store: RunStore, runId: stri
   return { session, site, steps, login };
 }
 
-export function runCli(main: () => Promise<void>): void {
-  main().catch((err) => {
+export async function runCli(
+  main: (ctx: { cfg: AgentConfig; store: RunStore }) => Promise<void>,
+): Promise<void> {
+  let store: RunStore | undefined;
+  try {
+    const cfg = loadConfig();
+    store = createStore(cfg);
+    await main({ cfg, store });
+  } catch (err) {
     console.error(errorMessage(err));
-    process.exit(1);
-  });
+    process.exitCode = 1;
+  } finally {
+    await store?.close();
+  }
 }

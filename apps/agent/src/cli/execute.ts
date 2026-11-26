@@ -1,13 +1,12 @@
 import { parseArgs } from 'node:util';
 import { recordPath } from '../browser/demo-site';
 import { StaleRecordError, errorMessage } from '../core/errors';
-import { openBrowser, runCli, setup } from './start-run';
+import { openBrowser, runCli } from './start-run';
 
-runCli(async () => {
+runCli(async ({ cfg, store }) => {
   const runId = parseArgs({ options: { run: { type: 'string' } } }).values.run;
   if (!runId) throw new Error('Usage: execute --run <runId>');
 
-  const { cfg, store } = setup();
   const run = await store.getRun(runId);
   const proposals = await store.getProposals(runId);
   const todo = proposals.filter((p) => p.status === 'approved');

@@ -1,13 +1,14 @@
-import { mkdir, readFile, readdir, writeFile, appendFile } from 'node:fs/promises';
+import { appendFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
 import { z } from 'zod';
-import { Finding, ProposedAction, RawRecord, RunMeta, StepLog } from './schemas';
+import { Finding, ProposedAction, RunMeta, StepLog, type RawRecord } from './schemas';
+import { applyDecision, type Decision, type RunStore } from './store';
 
-export class RunStore {
+export class FileStore implements RunStore {
   constructor(private readonly root: string) {}
 
-  dir(runId: string): string {
+  private dir(runId: string): string {
     return path.join(this.root, runId);
   }
 
@@ -55,6 +56,15 @@ export class RunStore {
     return this.write(runId, 'proposals.json', proposals);
   }
 
+  async decide(runId: string, actionId: string, decision: Decision): Promise<boolean> {
+    const proposals = await this.getProposals(runId);
+    const i = proposals.findIndex((p) => p.id === actionId && p.status === 'pending');
+    if (i < 0) return false;
+    proposals[i] = applyDecision(proposals[i]!, decision);
+    await this.saveProposals(runId, proposals);
+    return true;
+  }
+
   async appendStep(step: StepLog): Promise<void> {
     await appendFile(path.join(this.dir(step.runId), 'steps.jsonl'), JSON.stringify(step) + '\n');
   }
@@ -63,8 +73,12 @@ export class RunStore {
     const file = path.join(this.dir(runId), 'steps.jsonl');
     if (!existsSync(file)) return [];
     const lines = (await readFile(file, 'utf8')).split('\n').filter(Boolean);
-    return lines.map((l) => StepLog.parse(JSON.parse(l)));
+    return lines
+      .map((l) => StepLog.parse(JSON.parse(l)))
+      .sort((a, b) => a.n - b.n || a.attempt - b.attempt);
   }
+
+  async close(): Promise<void> {}
 
   private async read<T>(runId: string, file: string, schema: z.ZodType<T>): Promise<T> {
     const raw = await readFile(path.join(this.dir(runId), file), 'utf8');

@@ -17,6 +17,19 @@ jobs:
   check:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    services: &services
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: aba
+          POSTGRES_PASSWORD: aba
+          POSTGRES_DB: aba
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://aba:aba@localhost:5432/aba
     steps:
       - uses: actions/checkout@v7
 
@@ -34,6 +47,13 @@ jobs:
   e2e:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    strategy:
+      matrix:
+        store: [file, postgres]
+    services: *services
+    env:
+      STORE: ${{ matrix.store }}
+      DATABASE_URL: postgres://aba:aba@localhost:5432/aba
     steps:
       - uses: actions/checkout@v7
 
