@@ -2,10 +2,9 @@ import type { RawRecord, RunMeta } from '../domain';
 import { errorMessage } from '../core/errors';
 import { analyzeWithRules } from '../analysis/rules';
 import { analyzeWithModel, createChat } from '../analysis/model';
-import { openBrowser, runCli, setup } from './start-run';
+import { openBrowser, runCli } from './start-run';
 
-runCli(async () => {
-  const { cfg, store } = setup();
+runCli(async ({ cfg, store }) => {
   const run: RunMeta = {
     id: new Date().toISOString().replace(/[:.]/g, '-'),
     status: 'running',

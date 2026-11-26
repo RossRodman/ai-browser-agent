@@ -1,21 +1,20 @@
 import express from 'express';
-import { loadEnv, resolveRunsDir } from '../config';
-import { RunStore } from '../domain';
+import { loadConfig } from '../config';
+import { createStore } from '../domain';
 
-loadEnv();
+const cfg = loadConfig();
 
 const PORT = Number(process.env.APPROVAL_PORT ?? 4000);
-const RUNS_DIR = resolveRunsDir();
 const REVIEWER = process.env.REVIEWER ?? 'reviewer';
 
-const store = new RunStore(RUNS_DIR);
+const store = createStore(cfg);
 const app = express();
 app.use(express.urlencoded({ extended: false }));
 app.use((_req, res, next) => {
   res.setHeader('Cache-Control', 'no-store');
   next();
 });
-app.use('/files', express.static(RUNS_DIR));
+app.use('/files', express.static(cfg.runsDir));
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
@@ -57,7 +56,7 @@ app.get('/', async (_req, res) => {
       'Runs',
       `<h1>Runs</h1>
       ${table(['Run', 'Status', 'Mode', 'Started', 'Error'], rows, 'No runs yet')}
-      <p><small>Runs folder: <code>${esc(RUNS_DIR)}</code></small></p>`,
+      <p><small>Store: <code>${esc(cfg.store)}</code> · Screenshots: <code>${esc(cfg.runsDir)}</code></small></p>`,
     ),
   );
 });
@@ -136,22 +135,20 @@ app.post('/runs/:id/actions/:actionId', async (req, res) => {
   const body = req.body as Record<string, string>;
   const decision = body.decision === 'approved' ? 'approved' : 'rejected';
 
-  const proposals = await store.getProposals(id);
-  const action = proposals.find((p) => p.id === actionId);
-  if (!action || action.status !== 'pending') {
+  const applied = await store.decide(id, actionId, {
+    decision,
+    editedTo: body.editedTo?.trim(),
+    by: REVIEWER,
+  });
+  if (!applied) {
     res.status(409).send(layout('Conflict', '<p>Action not found or already processed.</p>'));
     return;
   }
-
-  const editedTo = body.editedTo?.trim();
-  action.status = decision;
-  if (decision === 'approved' && editedTo) action.to = editedTo;
-  action.decidedBy = REVIEWER;
-  action.decidedAt = new Date().toISOString();
-  await store.saveProposals(id, proposals);
   res.redirect(`/runs/${id}`);
 });
 
 app.listen(PORT, () => {
-  console.log(`Approval UI: http://localhost:${PORT} (runs: ${RUNS_DIR})`);
+  console.log(
+    `Approval UI: http://localhost:${PORT} (store: ${cfg.store}, screenshots: ${cfg.runsDir})`,
+  );
 });
