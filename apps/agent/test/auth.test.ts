@@ -23,9 +23,7 @@ describe('passwords', () => {
   });
 
   it('reads reviewers from a comma-separated list', () => {
-    const reviewers = parseReviewers(
-      `ross:${hashPassword('a')}, bob:${hashPassword('b')},broken`,
-    );
+    const reviewers = parseReviewers(`ross:${hashPassword('a')}, bob:${hashPassword('b')},broken`);
     expect([...reviewers.keys()]).toEqual(['ross', 'bob']);
     expect(verifyPassword('b', reviewers.get('bob')!)).toBe(true);
   });
