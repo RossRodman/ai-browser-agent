@@ -6,10 +6,12 @@ import { fileURLToPath } from 'node:url';
 import { createStore } from '../src/domain';
 import { openSession } from '../src/browser/session';
 import { DemoSite } from '../src/browser/demo-site';
+import { hashPassword } from '../src/ui/auth';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../..');
 const BASE_URL = 'http://localhost:3199';
 const UI_URL = 'http://localhost:4199';
+const PASSWORD = 'e2e-password';
 
 function tsx(file: string, args: string[], env: NodeJS.ProcessEnv) {
   return spawn(process.execPath, ['--import', 'tsx', path.join(ROOT, file), ...args], {
@@ -54,6 +56,8 @@ export async function startApp() {
     LLM_API_KEY: '',
     STORE: process.env.STORE || 'file',
     DATABASE_URL: process.env.DATABASE_URL ?? '',
+    REVIEWERS: `e2e:${hashPassword(PASSWORD)}`,
+    SESSION_SECRET: 'e2e-session-secret-value',
   };
   const servers = [
     tsx('apps/demo-site/src/server.ts', [], env),
@@ -61,6 +65,16 @@ export async function startApp() {
   ];
   await Promise.all([waitFor(BASE_URL), waitFor(UI_URL)]);
   const store = createStore({ store: env.STORE, databaseUrl: env.DATABASE_URL, runsDir });
+
+  const signIn = async (password = PASSWORD) => {
+    const res = await fetch(`${UI_URL}/login`, {
+      method: 'POST',
+      headers: { origin: UI_URL },
+      body: new URLSearchParams({ username: 'e2e', password }),
+      redirect: 'manual',
+    });
+    return res.headers.get('set-cookie')?.split(';')[0];
+  };
 
   return {
     scan: () => run('apps/agent/src/cli/scan.ts', [], env),
@@ -72,12 +86,22 @@ export async function startApp() {
       return { id: meta!.id, proposals: await store.getProposals(meta!.id) };
     },
 
-    decide: (runId: string, actionId: string, decision: 'approved' | 'rejected') =>
+    signIn,
+
+    decide: async (
+      runId: string,
+      actionId: string,
+      decision: 'approved' | 'rejected',
+      { cookie, origin = UI_URL }: { cookie?: string; origin?: string } = {},
+    ) =>
       fetch(`${UI_URL}/runs/${runId}/actions/${actionId}`, {
         method: 'POST',
+        headers: { origin, cookie: cookie ?? (await signIn()) ?? '' },
         body: new URLSearchParams({ decision }),
         redirect: 'manual',
       }),
+
+    get: (urlPath: string) => fetch(UI_URL + urlPath, { redirect: 'manual' }),
 
     readField: async (recordId: string, field: string) => {
       const login = await fetch(`${BASE_URL}/login`, {

@@ -7,7 +7,8 @@
     "scan": "tsx src/cli/scan.ts",
     "execute": "tsx src/cli/execute.ts",
     "ui": "tsx watch src/ui/server.ts",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "hash": "tsx src/cli/hash-password.ts"
   },
   "dependencies": {
     "express": "^5.1.0",

@@ -16,6 +16,7 @@
     "approval": "npm run ui -w @aba/agent",
     "agent:scan": "npm run scan -w @aba/agent",
     "agent:execute": "npm run execute -w @aba/agent --",
+    "reviewer:hash": "npm run hash -w @aba/agent --",
     "db:up": "docker compose -f infra/docker-compose.yml up -d postgres",
     "db:down": "docker compose -f infra/docker-compose.yml down",
     "typecheck": "npm run typecheck --workspaces",

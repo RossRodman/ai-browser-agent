@@ -1,11 +1,28 @@
 import express from 'express';
 import { loadConfig } from '../config';
 import { createStore } from '../domain';
+import {
+  SESSION_TTL_MS,
+  createSession,
+  parseReviewers,
+  requireUser,
+  sameOrigin,
+  sessionCookie,
+  verifyPassword,
+} from './auth';
 
 const cfg = loadConfig();
 
 const PORT = Number(process.env.APPROVAL_PORT ?? 4000);
-const REVIEWER = process.env.REVIEWER ?? 'reviewer';
+const reviewers = parseReviewers(cfg.reviewers);
+if (reviewers.size === 0 || cfg.sessionSecret.length < 16) {
+  console.error(
+    'Approval UI needs REVIEWERS and SESSION_SECRET (16+ characters) in .env.\n' +
+      'Create a password hash with: npm run reviewer:hash -- <password>',
+  );
+  process.exit(1);
+}
+const auth = requireUser(cfg.sessionSecret);
 
 const store = createStore(cfg);
 const app = express();
@@ -14,11 +31,14 @@ app.use((_req, res, next) => {
   res.setHeader('Cache-Control', 'no-store');
   next();
 });
-app.use('/files', express.static(cfg.runsDir));
+app.use('/files', auth, express.static(cfg.runsDir));
 
 const esc = (s: unknown) => String(s ?? '').replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
 
-function layout(title: string, body: string): string {
+function layout(title: string, body: string, user?: string): string {
+  const header = user
+    ? `<form method="post" action="/logout" style="float:right">Signed in as <b>${esc(user)}</b> <button>Sign out</button></form>`
+    : '';
   return `<!doctype html>
 <html><head><meta charset="utf-8"><title>${esc(title)}</title>
 <style>
@@ -31,8 +51,48 @@ function layout(title: string, body: string): string {
   .high{color:#c00}.medium{color:#a60}.low{color:#666}
   .source-model{background:#eef;padding:0 .3rem;border-radius:3px}
   img{max-width:240px;border:1px solid #ddd}
-</style></head><body>${body}</body></html>`;
+</style></head><body>${header}${body}</body></html>`;
 }
+
+app.get('/login', (req, res) => {
+  const next = esc(encodeURIComponent(String(req.query.next ?? '/')));
+  res.send(
+    layout(
+      'Sign in',
+      `<h1>Sign in</h1>
+      <form method="post" action="/login?next=${next}">
+        <p><label>Username <input name="username" autocomplete="username"></label></p>
+        <p><label>Password <input name="password" type="password" autocomplete="current-password"></label></p>
+        <button>Sign in</button>
+      </form>`,
+    ),
+  );
+});
+
+app.post('/login', sameOrigin, (req, res) => {
+  const { username = '', password = '' } = req.body as Record<string, string>;
+  const hash = reviewers.get(username);
+  if (!hash || !verifyPassword(password, hash)) {
+    res
+      .status(401)
+      .send(
+        layout(
+          'Sign in',
+          '<h1>Sign in</h1><p>Wrong username or password. <a href="/login">Try again</a></p>',
+        ),
+      );
+    return;
+  }
+  const token = createSession(username, cfg.sessionSecret);
+  res.setHeader('Set-Cookie', sessionCookie(token, SESSION_TTL_MS));
+  const next = String(req.query.next ?? '/');
+  res.redirect(next.startsWith('/') && !next.startsWith('//') ? next : '/');
+});
+
+app.post('/logout', sameOrigin, (_req, res) => {
+  res.setHeader('Set-Cookie', sessionCookie('', 0));
+  res.redirect('/login');
+});
 
 const source = (s: string) => `<small class="source-${esc(s)}">${esc(s)}</small>`;
 
@@ -42,7 +102,7 @@ function table(headers: string[], rows: string[], empty = 'None'): string {
   return `<table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>`;
 }
 
-app.get('/', async (_req, res) => {
+app.get('/', auth, async (_req, res) => {
   const runs = await store.listRuns();
   const rows = runs.map(
     (r) => `<tr>
@@ -57,12 +117,13 @@ app.get('/', async (_req, res) => {
       `<h1>Runs</h1>
       ${table(['Run', 'Status', 'Mode', 'Started', 'Error'], rows, 'No runs yet')}
       <p><small>Store: <code>${esc(cfg.store)}</code> · Screenshots: <code>${esc(cfg.runsDir)}</code></small></p>`,
+      res.locals.user,
     ),
   );
 });
 
-app.get('/runs/:id', async (req, res) => {
-  const id = req.params.id;
+app.get('/runs/:id', auth, async (req, res) => {
+  const { id } = req.params as { id: string };
   const [run, findings, proposals, steps] = await Promise.all([
     store.getRun(id),
     store.getFindings(id).catch(() => []),
@@ -126,19 +187,20 @@ app.get('/runs/:id', async (req, res) => {
 
       <h2>Steps (${steps.length})</h2>
       ${table(['#', 'Step', 'Attempt', 'Result', 'Time', 'Details', 'Screenshot'], stepRows)}`,
+      res.locals.user,
     ),
   );
 });
 
-app.post('/runs/:id/actions/:actionId', async (req, res) => {
-  const { id, actionId } = req.params;
+app.post('/runs/:id/actions/:actionId', sameOrigin, auth, async (req, res) => {
+  const { id, actionId } = req.params as { id: string; actionId: string };
   const body = req.body as Record<string, string>;
   const decision = body.decision === 'approved' ? 'approved' : 'rejected';
 
   const applied = await store.decide(id, actionId, {
     decision,
     editedTo: body.editedTo?.trim(),
-    by: REVIEWER,
+    by: res.locals.user,
   });
   if (!applied) {
     res.status(409).send(layout('Conflict', '<p>Action not found or already processed.</p>'));
