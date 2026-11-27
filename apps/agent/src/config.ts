@@ -20,6 +20,8 @@ export interface AgentConfig {
   runsDir: string;
   store: string;
   databaseUrl: string;
+  reviewers: string;
+  sessionSecret: string;
   headless: boolean;
   maxAttempts: number;
   browserPath?: string;
@@ -36,6 +38,8 @@ export function loadConfig(): AgentConfig {
     runsDir: resolveRunsDir(),
     store: env.STORE || 'file',
     databaseUrl: env.DATABASE_URL ?? '',
+    reviewers: env.REVIEWERS ?? '',
+    sessionSecret: env.SESSION_SECRET ?? '',
     headless: env.HEADLESS !== 'false',
     maxAttempts: Number(env.MAX_ATTEMPTS ?? 3),
     browserPath: env.BROWSER_PATH || undefined,
